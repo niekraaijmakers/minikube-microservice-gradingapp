@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: student-service
+  namespace: grading-system
+  labels:
+    app: student-service
+spec:
+  type: ClusterIP
+  selector:
+    app: student-service
+  ports:
+  - name: http
+    port: 5001
+    targetPort: 5001
+    protocol: TCP
+

@@ -1,0 +1,34 @@
+# Allow Grade Service to reach Student Service
+# =============================================
+# The grade-service needs to call student-service to enrich grades with student names.
+# This is the KEY EGRESS DEMONSTRATION:
+#   - Grade service CAN reach student service ✅
+#   - Grade service CANNOT reach external internet ❌ (no policy allows it)
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-grade-to-student
+  namespace: grading-system
+spec:
+  podSelector:
+    matchLabels:
+      app: grade-service
+  policyTypes:
+  - Egress
+  egress:
+  # Allow ONLY to student-service
+  - to:
+    - podSelector:
+        matchLabels:
+          app: student-service
+    ports:
+    - protocol: TCP
+      port: 5001
+  
+  # NOTE: There is NO rule allowing external internet access!
+  # This means the grade-service cannot reach google.com, httpbin.org, etc.
+  # Test this with:
+  #   kubectl exec -it deploy/grade-service -n grading-system -- curl http://google.com
+  # It should timeout or be blocked!
+

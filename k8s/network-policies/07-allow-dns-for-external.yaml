@@ -1,0 +1,30 @@
+# Allow DNS resolution for cross-namespace communication
+# =======================================================
+# This policy ensures grade-service can resolve DNS names in external-services namespace.
+# Required for resolving "webhook-receiver.external-services.svc.cluster.local"
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-external
+  namespace: grading-system
+spec:
+  podSelector:
+    matchLabels:
+      app: grade-service
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+

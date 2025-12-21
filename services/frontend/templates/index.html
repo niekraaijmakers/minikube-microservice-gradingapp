@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Student Grading System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Student Grading System</h1>
+    <p>A microservices demonstration on Kubernetes with Ingress & Egress</p>
+</div>
+
+<div class="grid grid-3">
+    <a href="/students" class="card" style="text-decoration: none; color: inherit; transition: transform 0.2s, box-shadow 0.2s;">
+        <div class="card-icon" style="background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple)); width: 48px; height: 48px; margin-bottom: 1rem;">
+            👥
+        </div>
+        <h3 style="margin-bottom: 0.5rem;">Students</h3>
+        <p style="color: var(--text-secondary); font-size: 0.95rem;">
+            Manage student records. View, add, and remove students from the system.
+        </p>
+        <div style="margin-top: 1rem; color: var(--accent-cyan); font-weight: 500;">
+            View Students →
+        </div>
+    </a>
+
+    <a href="/grades" class="card" style="text-decoration: none; color: inherit; transition: transform 0.2s, box-shadow 0.2s;">
+        <div class="card-icon" style="background: linear-gradient(135deg, var(--accent-teal), var(--accent-cyan)); width: 48px; height: 48px; margin-bottom: 1rem;">
+            📝
+        </div>
+        <h3 style="margin-bottom: 0.5rem;">Grades</h3>
+        <p style="color: var(--text-secondary); font-size: 0.95rem;">
+            Manage course grades. Track academic performance across semesters.
+        </p>
+        <div style="margin-top: 1rem; color: var(--accent-teal); font-weight: 500;">
+            View Grades →
+        </div>
+    </a>
+
+    <a href="/architecture" class="card" style="text-decoration: none; color: inherit; transition: transform 0.2s, box-shadow 0.2s;">
+        <div class="card-icon" style="background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink)); width: 48px; height: 48px; margin-bottom: 1rem;">
+            🏗️
+        </div>
+        <h3 style="margin-bottom: 0.5rem;">Architecture</h3>
+        <p style="color: var(--text-secondary); font-size: 0.95rem;">
+            Explore the microservices architecture and Kubernetes concepts.
+        </p>
+        <div style="margin-top: 1rem; color: var(--accent-purple); font-weight: 500;">
+            View Architecture →
+        </div>
+    </a>
+</div>
+
+<div class="card" style="margin-top: 2rem;">
+    <div class="card-header">
+        <div class="card-title">
+            <span class="card-icon">☸️</span>
+            System Overview
+        </div>
+    </div>
+    
+    <div class="grid grid-2">
+        <div>
+            <h4 style="color: var(--accent-cyan); margin-bottom: 1rem;">🔵 Ingress (Traffic IN)</h4>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                External HTTP traffic enters through the <strong>Ingress Controller</strong> (nginx) 
+                which routes requests to different services based on URL paths:
+            </p>
+            <ul style="color: var(--text-secondary); margin-left: 1.5rem; margin-bottom: 1rem;">
+                <li><code style="color: var(--accent-cyan);">/</code> → Frontend Service</li>
+                <li><code style="color: var(--accent-cyan);">/api/students</code> → Student Service</li>
+                <li><code style="color: var(--accent-cyan);">/api/grades</code> → Grade Service</li>
+            </ul>
+        </div>
+        
+        <div>
+            <h4 style="color: var(--accent-teal); margin-bottom: 1rem;">🟢 Egress (Traffic OUT)</h4>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                <strong>NetworkPolicies</strong> control what each service can talk to:
+            </p>
+            <ul style="color: var(--text-secondary); margin-left: 1.5rem; margin-bottom: 1rem;">
+                <li>Grade Service → Can call Student Service ✓</li>
+                <li>Grade Service → External internet ✗ (blocked)</li>
+                <li>Student Service → External internet ✗ (blocked)</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">
+            <span class="card-icon">📊</span>
+            Service Status
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="refreshStatus()">
+            🔄 Refresh
+        </button>
+    </div>
+    
+    <div id="status-container" class="grid grid-3">
+        <div class="alert alert-info">
+            <span class="spinner"></span>
+            Loading status...
+        </div>
+    </div>
+</div>
+
+<style>
+    .card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+    }
+    
+    .status-card {
+        background: var(--bg-tertiary);
+        border-radius: var(--radius-md);
+        padding: 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .status-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+    }
+    
+    .status-healthy .status-icon {
+        background: rgba(63, 185, 80, 0.2);
+    }
+    
+    .status-unhealthy .status-icon {
+        background: rgba(248, 81, 73, 0.2);
+    }
+    
+    code {
+        background: var(--bg-tertiary);
+        padding: 0.2rem 0.4rem;
+        border-radius: 4px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.85em;
+    }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function refreshStatus() {
+    const container = document.getElementById('status-container');
+    container.innerHTML = `
+        <div class="alert alert-info">
+            <span class="spinner"></span>
+            Checking services...
+        </div>
+    `;
+    
+    try {
+        const response = await fetch('/api/status');
+        const status = await response.json();
+        
+        container.innerHTML = `
+            <div class="status-card ${status.frontend === 'healthy' ? 'status-healthy' : 'status-unhealthy'}">
+                <div class="status-icon">${status.frontend === 'healthy' ? '✅' : '❌'}</div>
+                <div>
+                    <strong>Frontend</strong>
+                    <div style="color: var(--text-secondary); font-size: 0.85rem;">Port 5000</div>
+                </div>
+            </div>
+            
+            <div class="status-card ${status.student_service === 'healthy' ? 'status-healthy' : 'status-unhealthy'}">
+                <div class="status-icon">${status.student_service === 'healthy' ? '✅' : '❌'}</div>
+                <div>
+                    <strong>Student Service</strong>
+                    <div style="color: var(--text-secondary); font-size: 0.85rem;">Port 5001</div>
+                </div>
+            </div>
+            
+            <div class="status-card ${status.grade_service === 'healthy' ? 'status-healthy' : 'status-unhealthy'}">
+                <div class="status-icon">${status.grade_service === 'healthy' ? '✅' : '❌'}</div>
+                <div>
+                    <strong>Grade Service</strong>
+                    <div style="color: var(--text-secondary); font-size: 0.85rem;">Port 5002</div>
+                </div>
+            </div>
+        `;
+    } catch (e) {
+        container.innerHTML = `
+            <div class="alert alert-error">
+                ❌ Could not fetch service status
+            </div>
+        `;
+    }
+}
+
+refreshStatus();
+</script>
+{% endblock %}
+

@@ -1,0 +1,60 @@
+# Allow Ingress Controller to reach API Services
+# ===============================================
+# This policy allows the nginx-ingress-controller to send traffic directly to 
+# the student-service and grade-service for API requests.
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-student-service
+  namespace: grading-system
+spec:
+  podSelector:
+    matchLabels:
+      app: student-service
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    # Allow from ingress-nginx namespace
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+    # Also allow from frontend (for proxied requests)
+    - podSelector:
+        matchLabels:
+          app: frontend
+    # Also allow from grade-service (for enrichment)
+    - podSelector:
+        matchLabels:
+          app: grade-service
+    ports:
+    - protocol: TCP
+      port: 5001
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-grade-service
+  namespace: grading-system
+spec:
+  podSelector:
+    matchLabels:
+      app: grade-service
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    # Allow from ingress-nginx namespace
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+    # Also allow from frontend (for proxied requests)
+    - podSelector:
+        matchLabels:
+          app: frontend
+    ports:
+    - protocol: TCP
+      port: 5002
+

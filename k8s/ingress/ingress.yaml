@@ -1,0 +1,97 @@
+# Ingress Configuration
+# ======================
+# This Ingress resource defines how external HTTP traffic reaches our services.
+# The nginx-ingress-controller reads these rules and configures routing accordingly.
+#
+# Traffic Flow:
+#   Internet → Ingress Controller → Service → Pods
+#
+# URL Routing:
+#   http://grading.local/              → frontend:5000
+#   http://grading.local/api/students  → student-service:5001
+#   http://grading.local/api/grades    → grade-service:5002
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grading-ingress
+  namespace: grading-system
+  labels:
+    app: student-grading
+  annotations:
+    # nginx-ingress specific annotations
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    # Enable CORS for API endpoints
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: grading.local
+    http:
+      paths:
+      # API routes - Student Service
+      - path: /api/students(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: student-service
+            port:
+              number: 5001
+      
+      # API routes - Grade Service
+      - path: /api/grades(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: grade-service
+            port:
+              number: 5002
+      
+      # Default route - Frontend
+      - path: /(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: frontend
+            port:
+              number: 5000
+
+---
+# Alternative simple ingress without regex (for learning purposes)
+# Uncomment this and comment the above if you want simpler path matching
+
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: grading-ingress-simple
+#   namespace: grading-system
+# spec:
+#   ingressClassName: nginx
+#   rules:
+#   - host: grading.local
+#     http:
+#       paths:
+#       - path: /api/students
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: student-service
+#             port:
+#               number: 5001
+#       - path: /api/grades
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: grade-service
+#             port:
+#               number: 5002
+#       - path: /
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: frontend
+#             port:
+#               number: 5000
+

@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grade-service
+  namespace: grading-system
+  labels:
+    app: grade-service
+    tier: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: grade-service
+  template:
+    metadata:
+      labels:
+        app: grade-service
+        tier: backend
+    spec:
+      containers:
+      - name: grade-service
+        image: grade-service:latest
+        imagePullPolicy: Never  # Use local images (built with minikube docker)
+        ports:
+        - containerPort: 5002
+          name: http
+        env:
+        - name: SERVICE_PORT
+          value: "5002"
+        - name: STUDENT_SERVICE_URL
+          value: "http://student-service:5001"
+        - name: WEBHOOK_URL
+          value: "http://webhook-receiver.external-services.svc.cluster.local:5005"
+        - name: WEBHOOK_ENABLED
+          value: "true"
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5002
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5002
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+

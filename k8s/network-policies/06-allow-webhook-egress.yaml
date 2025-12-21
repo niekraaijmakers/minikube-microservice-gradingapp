@@ -1,0 +1,49 @@
+# Allow Grade Service to send Webhooks (EGRESS DEMO!)
+# ====================================================
+# 
+# THIS IS THE KEY NETWORK POLICY FOR THE EGRESS DEMONSTRATION!
+# 
+# By default, this policy is NOT applied, so:
+#   - Grade service CANNOT reach webhook-receiver in external-services namespace
+#   - When you add a grade, the webhook will FAIL with "Connection refused"
+#
+# After applying this policy:
+#   - Grade service CAN reach webhook-receiver
+#   - When you add a grade, the webhook will SUCCEED
+#
+# DEMO FLOW:
+#   1. Deploy without this policy → webhooks fail (blocked)
+#   2. Add a grade → see webhook error in response
+#   3. Apply this policy: kubectl apply -f 06-allow-webhook-egress.yaml
+#   4. Add another grade → see webhook success!
+#   5. Check webhook-receiver logs to see the notification
+#
+# This demonstrates how NetworkPolicies control egress (outbound) traffic!
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-webhook-egress
+  namespace: grading-system
+  labels:
+    demo: egress
+    purpose: allow-webhook-notifications
+spec:
+  podSelector:
+    matchLabels:
+      app: grade-service
+  policyTypes:
+  - Egress
+  egress:
+  # Allow egress to webhook-receiver in external-services namespace
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: external-services
+      podSelector:
+        matchLabels:
+          app: webhook-receiver
+    ports:
+    - protocol: TCP
+      port: 5005
+

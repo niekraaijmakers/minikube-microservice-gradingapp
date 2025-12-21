@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+
+{% block title %}Students - Student Grading System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Students</h1>
+    <p>Manage student records in the system</p>
+</div>
+
+<div id="alert-container"></div>
+
+<div class="grid grid-2">
+    <!-- Add Student Form -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">
+                <span class="card-icon">➕</span>
+                Add New Student
+            </div>
+        </div>
+        <form id="add-student-form">
+            <div class="form-group">
+                <label for="name">Full Name *</label>
+                <input type="text" id="name" name="name" placeholder="Enter student name" required>
+            </div>
+            <div class="form-group">
+                <label for="email">Email Address *</label>
+                <input type="email" id="email" name="email" placeholder="student@university.edu" required>
+            </div>
+            <div class="grid grid-2" style="gap: 1rem;">
+                <div class="form-group">
+                    <label for="age">Age</label>
+                    <input type="number" id="age" name="age" placeholder="20" min="16" max="100">
+                </div>
+                <div class="form-group">
+                    <label for="gpa">GPA</label>
+                    <input type="number" id="gpa" name="gpa" placeholder="3.5" min="0" max="4" step="0.1">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="major">Major</label>
+                <input type="text" id="major" name="major" placeholder="Computer Science">
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;">
+                ➕ Add Student
+            </button>
+        </form>
+    </div>
+
+    <!-- Filter/Search -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">
+                <span class="card-icon">🔍</span>
+                Filter Students
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="search">Search by Name</label>
+            <input type="text" id="search" placeholder="Type to search..." onkeyup="filterStudents()">
+        </div>
+        <div class="form-group">
+            <label for="major-filter">Filter by Major</label>
+            <select id="major-filter" onchange="filterStudents()">
+                <option value="">All Majors</option>
+            </select>
+        </div>
+        <button class="btn btn-secondary" onclick="loadStudents()" style="width: 100%;">
+            🔄 Refresh List
+        </button>
+    </div>
+</div>
+
+<!-- Students Table -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">
+            <span class="card-icon">👥</span>
+            <span>Student List</span>
+            <span id="student-count" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 400; margin-left: 0.5rem;"></span>
+        </div>
+    </div>
+    
+    <div class="table-container">
+        <table id="students-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Age</th>
+                    <th>Major</th>
+                    <th>GPA</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="students-body">
+                <tr>
+                    <td colspan="7" class="empty-state">
+                        <span class="spinner"></span> Loading students...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let allStudents = [];
+
+async function loadStudents() {
+    const tbody = document.getElementById('students-body');
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><span class="spinner"></span> Loading students...</td></tr>`;
+    
+    try {
+        const response = await fetch('/api/students');
+        const data = await response.json();
+        
+        if (data.success) {
+            allStudents = data.data;
+            displayStudents(allStudents);
+            loadMajors();
+        } else {
+            showAlert('error', data.error || 'Failed to load students');
+        }
+    } catch (e) {
+        showAlert('error', 'Could not connect to student service');
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-state">❌ Failed to load students</td></tr>`;
+    }
+}
+
+function displayStudents(students) {
+    const tbody = document.getElementById('students-body');
+    document.getElementById('student-count').textContent = `(${students.length} students)`;
+    
+    if (students.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-state">📭 No students found</td></tr>`;
+        return;
+    }
+    
+    tbody.innerHTML = students.map(s => `
+        <tr>
+            <td>${s.id}</td>
+            <td><strong>${escapeHtml(s.name)}</strong></td>
+            <td style="color: var(--text-secondary);">${escapeHtml(s.email)}</td>
+            <td>${s.age || '-'}</td>
+            <td>${s.major ? `<span style="color: var(--accent-cyan);">${escapeHtml(s.major)}</span>` : '-'}</td>
+            <td>${s.gpa ? getGpaBadge(s.gpa) : '-'}</td>
+            <td>
+                <button class="btn btn-danger btn-sm" onclick="deleteStudent(${s.id}, '${escapeHtml(s.name)}')">
+                    🗑️ Delete
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function getGpaBadge(gpa) {
+    let cls = 'badge-c';
+    if (gpa >= 3.5) cls = 'badge-a';
+    else if (gpa >= 3.0) cls = 'badge-b';
+    else if (gpa >= 2.0) cls = 'badge-c';
+    else cls = 'badge-d';
+    return `<span class="badge ${cls}">${gpa.toFixed(2)}</span>`;
+}
+
+async function loadMajors() {
+    try {
+        const response = await fetch('/api/students/majors');
+        const data = await response.json();
+        
+        if (data.success) {
+            const select = document.getElementById('major-filter');
+            select.innerHTML = '<option value="">All Majors</option>' + 
+                data.data.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
+        }
+    } catch (e) {
+        console.error('Could not load majors');
+    }
+}
+
+function filterStudents() {
+    const search = document.getElementById('search').value.toLowerCase();
+    const major = document.getElementById('major-filter').value;
+    
+    const filtered = allStudents.filter(s => {
+        const matchesSearch = !search || s.name.toLowerCase().includes(search);
+        const matchesMajor = !major || s.major === major;
+        return matchesSearch && matchesMajor;
+    });
+    
+    displayStudents(filtered);
+}
+
+document.getElementById('add-student-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const formData = {
+        name: document.getElementById('name').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        age: document.getElementById('age').value ? parseInt(document.getElementById('age').value) : null,
+        major: document.getElementById('major').value.trim(),
+        gpa: document.getElementById('gpa').value ? parseFloat(document.getElementById('gpa').value) : null
+    };
+    
+    try {
+        const response = await fetch('/api/students', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showAlert('success', 'Student added successfully!');
+            e.target.reset();
+            loadStudents();
+        } else {
+            showAlert('error', data.error || 'Failed to add student');
+        }
+    } catch (e) {
+        showAlert('error', 'Could not connect to student service');
+    }
+});
+
+async function deleteStudent(id, name) {
+    if (!confirm(`Are you sure you want to delete ${name}?`)) return;
+    
+    try {
+        const response = await fetch(`/api/students/${id}`, { method: 'DELETE' });
+        const data = await response.json();
+        
+        if (data.success) {
+            showAlert('success', 'Student deleted successfully');
+            loadStudents();
+        } else {
+            showAlert('error', data.error || 'Failed to delete student');
+        }
+    } catch (e) {
+        showAlert('error', 'Could not connect to student service');
+    }
+}
+
+function showAlert(type, message) {
+    const container = document.getElementById('alert-container');
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type}`;
+    alert.innerHTML = `${type === 'success' ? '✅' : '❌'} ${escapeHtml(message)}`;
+    container.appendChild(alert);
+    
+    setTimeout(() => alert.remove(), 5000);
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Load students on page load
+loadStudents();
+</script>
+{% endblock %}
+

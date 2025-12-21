@@ -1,0 +1,461 @@
+{% extends "base.html" %}
+
+{% block title %}Grades - Student Grading System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Grades</h1>
+    <p>Manage student grades and academic records</p>
+</div>
+
+<div id="alert-container"></div>
+
+<div class="grid grid-2">
+    <!-- Add Grade Form -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">
+                <span class="card-icon">➕</span>
+                Add New Grade
+            </div>
+        </div>
+        <form id="add-grade-form">
+            <div class="form-group">
+                <label for="student_id">Student *</label>
+                <select id="student_id" name="student_id" required>
+                    <option value="">Select a student...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="course">Course Name *</label>
+                <input type="text" id="course" name="course" placeholder="Introduction to Programming" required>
+            </div>
+            <div class="grid grid-2" style="gap: 1rem;">
+                <div class="form-group">
+                    <label for="grade">Grade *</label>
+                    <select id="grade" name="grade" required>
+                        <option value="">Select grade...</option>
+                        <option value="A">A</option>
+                        <option value="A-">A-</option>
+                        <option value="B+">B+</option>
+                        <option value="B">B</option>
+                        <option value="B-">B-</option>
+                        <option value="C+">C+</option>
+                        <option value="C">C</option>
+                        <option value="C-">C-</option>
+                        <option value="D">D</option>
+                        <option value="F">F</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="credits">Credits</label>
+                    <input type="number" id="credits" name="credits" placeholder="3" min="1" max="6" value="3">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="semester">Semester *</label>
+                <input type="text" id="semester" name="semester" placeholder="Fall 2024" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;">
+                ➕ Add Grade
+            </button>
+        </form>
+    </div>
+
+    <!-- Filter -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">
+                <span class="card-icon">🔍</span>
+                Filter Grades
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="filter-student">Filter by Student</label>
+            <select id="filter-student" onchange="filterGrades()">
+                <option value="">All Students</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="filter-semester">Filter by Semester</label>
+            <select id="filter-semester" onchange="filterGrades()">
+                <option value="">All Semesters</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="filter-course">Search Course</label>
+            <input type="text" id="filter-course" placeholder="Type to search..." onkeyup="filterGrades()">
+        </div>
+        <button class="btn btn-secondary" onclick="loadGrades()" style="width: 100%;">
+            🔄 Refresh List
+        </button>
+    </div>
+</div>
+
+<!-- Grades Table -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">
+            <span class="card-icon">📝</span>
+            <span>Grade Records</span>
+            <span id="grade-count" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 400; margin-left: 0.5rem;"></span>
+        </div>
+    </div>
+    
+    <div class="table-container">
+        <table id="grades-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Student</th>
+                    <th>Course</th>
+                    <th>Grade</th>
+                    <th>Credits</th>
+                    <th>Semester</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="grades-body">
+                <tr>
+                    <td colspan="7" class="empty-state">
+                        <span class="spinner"></span> Loading grades...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Webhook Egress Demo Card -->
+<div class="card" style="border-color: var(--accent-purple);">
+    <div class="card-header">
+        <div class="card-title">
+            <span class="card-icon" style="background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));">📤</span>
+            Egress Demo: Webhook Notifications
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="loadWebhookStatus()">
+            🔄 Refresh
+        </button>
+    </div>
+    
+    <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+        When a grade is added, the grade-service tries to send a webhook notification to an 
+        <strong>external service</strong> (webhook-receiver in a different namespace).
+    </p>
+    
+    <div id="webhook-status" style="margin-bottom: 1rem;">
+        <div class="alert alert-info">
+            <span class="spinner"></span> Loading webhook status...
+        </div>
+    </div>
+    
+    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+        <button class="btn btn-primary" onclick="testWebhook()">
+            🧪 Test Webhook Now
+        </button>
+        <button class="btn btn-secondary" onclick="viewWebhookHistory()">
+            📋 View Webhook History
+        </button>
+    </div>
+    
+    <div id="webhook-result" style="margin-top: 1rem;"></div>
+    
+    <div style="margin-top: 1.5rem; padding: 1rem; background: var(--bg-tertiary); border-radius: var(--radius-sm);">
+        <h4 style="margin-bottom: 0.5rem; font-size: 0.9rem;">🎓 How This Demonstrates Egress:</h4>
+        <ul style="color: var(--text-secondary); font-size: 0.85rem; margin-left: 1.25rem;">
+            <li><strong>Without</strong> allow-webhook-egress policy: Webhook FAILS ❌</li>
+            <li><strong>With</strong> allow-webhook-egress policy: Webhook SUCCEEDS ✅</li>
+        </ul>
+        <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem;">
+            Apply policy: <code>kubectl apply -f k8s/network-policies/06-allow-webhook-egress.yaml</code>
+        </p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let allGrades = [];
+
+async function loadGrades() {
+    const tbody = document.getElementById('grades-body');
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><span class="spinner"></span> Loading grades...</td></tr>`;
+    
+    try {
+        const response = await fetch('/api/grades');
+        const data = await response.json();
+        
+        if (data.success) {
+            allGrades = data.data;
+            displayGrades(allGrades);
+            loadFilters();
+        } else {
+            showAlert('error', data.error || 'Failed to load grades');
+        }
+    } catch (e) {
+        showAlert('error', 'Could not connect to grade service');
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-state">❌ Failed to load grades</td></tr>`;
+    }
+}
+
+function displayGrades(grades) {
+    const tbody = document.getElementById('grades-body');
+    document.getElementById('grade-count').textContent = `(${grades.length} records)`;
+    
+    if (grades.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-state">📭 No grades found</td></tr>`;
+        return;
+    }
+    
+    tbody.innerHTML = grades.map(g => `
+        <tr>
+            <td>${g.id}</td>
+            <td><strong>${escapeHtml(g.student_name || 'Unknown')}</strong></td>
+            <td>${escapeHtml(g.course)}</td>
+            <td>${getGradeBadge(g.grade)}</td>
+            <td>${g.credits}</td>
+            <td style="color: var(--text-secondary);">${escapeHtml(g.semester)}</td>
+            <td>
+                <button class="btn btn-danger btn-sm" onclick="deleteGrade(${g.id})">
+                    🗑️ Delete
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function getGradeBadge(grade) {
+    let cls = 'badge-c';
+    if (grade.startsWith('A')) cls = 'badge-a';
+    else if (grade.startsWith('B')) cls = 'badge-b';
+    else if (grade.startsWith('C')) cls = 'badge-c';
+    else if (grade === 'D') cls = 'badge-d';
+    else if (grade === 'F') cls = 'badge-f';
+    return `<span class="badge ${cls}">${grade}</span>`;
+}
+
+async function loadFilters() {
+    // Load students for both the form and filter
+    try {
+        const response = await fetch('/api/students');
+        const data = await response.json();
+        
+        if (data.success) {
+            const studentSelect = document.getElementById('student_id');
+            const filterSelect = document.getElementById('filter-student');
+            
+            studentSelect.innerHTML = '<option value="">Select a student...</option>' + 
+                data.data.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+            
+            filterSelect.innerHTML = '<option value="">All Students</option>' + 
+                data.data.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+        }
+    } catch (e) {
+        console.error('Could not load students');
+    }
+    
+    // Load semesters
+    try {
+        const response = await fetch('/api/grades/semesters');
+        const data = await response.json();
+        
+        if (data.success) {
+            const select = document.getElementById('filter-semester');
+            select.innerHTML = '<option value="">All Semesters</option>' + 
+                data.data.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+        }
+    } catch (e) {
+        console.error('Could not load semesters');
+    }
+}
+
+function filterGrades() {
+    const studentId = document.getElementById('filter-student').value;
+    const semester = document.getElementById('filter-semester').value;
+    const course = document.getElementById('filter-course').value.toLowerCase();
+    
+    const filtered = allGrades.filter(g => {
+        const matchesStudent = !studentId || g.student_id == studentId;
+        const matchesSemester = !semester || g.semester === semester;
+        const matchesCourse = !course || g.course.toLowerCase().includes(course);
+        return matchesStudent && matchesSemester && matchesCourse;
+    });
+    
+    displayGrades(filtered);
+}
+
+document.getElementById('add-grade-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const formData = {
+        student_id: parseInt(document.getElementById('student_id').value),
+        course: document.getElementById('course').value.trim(),
+        grade: document.getElementById('grade').value,
+        semester: document.getElementById('semester').value.trim(),
+        credits: parseInt(document.getElementById('credits').value) || 3
+    };
+    
+    try {
+        const response = await fetch('/api/grades', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showAlert('success', 'Grade added successfully!');
+            e.target.reset();
+            loadGrades();
+        } else {
+            showAlert('error', data.error || 'Failed to add grade');
+        }
+    } catch (e) {
+        showAlert('error', 'Could not connect to grade service');
+    }
+});
+
+async function deleteGrade(id) {
+    if (!confirm('Are you sure you want to delete this grade?')) return;
+    
+    try {
+        const response = await fetch(`/api/grades/${id}`, { method: 'DELETE' });
+        const data = await response.json();
+        
+        if (data.success) {
+            showAlert('success', 'Grade deleted successfully');
+            loadGrades();
+        } else {
+            showAlert('error', data.error || 'Failed to delete grade');
+        }
+    } catch (e) {
+        showAlert('error', 'Could not connect to grade service');
+    }
+}
+
+async function loadWebhookStatus() {
+    const statusDiv = document.getElementById('webhook-status');
+    
+    try {
+        const response = await fetch('/api/grades/webhook/status');
+        const data = await response.json();
+        
+        if (data.success) {
+            const status = data.status;
+            const hasFailures = status.total_failures > 0;
+            const hasSuccesses = status.total_successes > 0;
+            
+            let statusHtml = '';
+            
+            if (status.total_attempts === 0) {
+                statusHtml = `
+                    <div class="alert alert-info">
+                        📊 No webhook attempts yet. Add a grade to trigger a webhook!
+                    </div>
+                `;
+            } else if (hasSuccesses && !hasFailures) {
+                statusHtml = `
+                    <div class="alert alert-success">
+                        ✅ Webhooks working! ${status.total_successes} successful, 0 failed
+                    </div>
+                `;
+            } else if (hasFailures && !hasSuccesses) {
+                statusHtml = `
+                    <div class="alert alert-error">
+                        ❌ Webhooks BLOCKED! ${status.total_failures} failed, 0 successful
+                        <br><small>NetworkPolicy is blocking egress to external-services namespace</small>
+                    </div>
+                `;
+            } else {
+                statusHtml = `
+                    <div class="alert alert-info">
+                        📊 Mixed results: ${status.total_successes} successful, ${status.total_failures} failed
+                    </div>
+                `;
+            }
+            
+            if (status.last_error) {
+                statusHtml += `<p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem;">Last error: ${status.last_error}</p>`;
+            }
+            
+            statusDiv.innerHTML = statusHtml;
+        }
+    } catch (e) {
+        statusDiv.innerHTML = `<div class="alert alert-error">Could not load webhook status</div>`;
+    }
+}
+
+async function testWebhook() {
+    const resultDiv = document.getElementById('webhook-result');
+    resultDiv.innerHTML = '<div class="alert alert-info"><span class="spinner"></span> Testing webhook...</div>';
+    
+    try {
+        const response = await fetch('/api/grades/webhook/test', { method: 'POST' });
+        const data = await response.json();
+        
+        if (data.success) {
+            resultDiv.innerHTML = `<div class="alert alert-success">${data.message}<br><small>${data.details}</small></div>`;
+        } else {
+            resultDiv.innerHTML = `<div class="alert alert-error">${data.message}<br><small>${data.details || ''}</small></div>`;
+        }
+        
+        // Refresh status
+        loadWebhookStatus();
+    } catch (e) {
+        resultDiv.innerHTML = `<div class="alert alert-error">❌ Could not test webhook: ${e.message}</div>`;
+    }
+}
+
+async function viewWebhookHistory() {
+    const resultDiv = document.getElementById('webhook-result');
+    resultDiv.innerHTML = '<div class="alert alert-info"><span class="spinner"></span> Loading history...</div>';
+    
+    try {
+        // This calls the webhook-receiver service via the grade-service proxy
+        const response = await fetch('/api/grades/webhook/status');
+        const data = await response.json();
+        
+        if (data.success) {
+            const status = data.status;
+            resultDiv.innerHTML = `
+                <div style="background: var(--bg-tertiary); padding: 1rem; border-radius: var(--radius-sm);">
+                    <h4 style="margin-bottom: 0.5rem;">Webhook Statistics</h4>
+                    <table style="width: 100%; font-size: 0.85rem;">
+                        <tr><td>Total Attempts:</td><td><strong>${status.total_attempts}</strong></td></tr>
+                        <tr><td>Successes:</td><td style="color: var(--accent-teal);"><strong>${status.total_successes}</strong></td></tr>
+                        <tr><td>Failures:</td><td style="color: var(--accent-red);"><strong>${status.total_failures}</strong></td></tr>
+                        <tr><td>Last Attempt:</td><td>${status.last_attempt || 'Never'}</td></tr>
+                        <tr><td>Last Success:</td><td>${status.last_success || 'Never'}</td></tr>
+                    </table>
+                </div>
+            `;
+        }
+    } catch (e) {
+        resultDiv.innerHTML = `<div class="alert alert-error">Could not load history</div>`;
+    }
+}
+
+function showAlert(type, message) {
+    const container = document.getElementById('alert-container');
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type}`;
+    alert.innerHTML = `${type === 'success' ? '✅' : '❌'} ${escapeHtml(message)}`;
+    container.appendChild(alert);
+    
+    setTimeout(() => alert.remove(), 5000);
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Load data on page load
+loadGrades();
+loadWebhookStatus();
+</script>
+{% endblock %}
+

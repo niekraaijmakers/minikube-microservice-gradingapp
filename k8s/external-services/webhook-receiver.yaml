@@ -1,0 +1,70 @@
+# Webhook Receiver - Simulated External Service
+# ==============================================
+# This deployment runs in the external-services namespace to simulate
+# an external webhook endpoint that our grade-service wants to call.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webhook-receiver
+  namespace: external-services
+  labels:
+    app: webhook-receiver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webhook-receiver
+  template:
+    metadata:
+      labels:
+        app: webhook-receiver
+    spec:
+      containers:
+      - name: webhook-receiver
+        image: webhook-receiver:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 5005
+          name: http
+        env:
+        - name: SERVICE_PORT
+          value: "5005"
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5005
+          initialDelaySeconds: 5
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5005
+          initialDelaySeconds: 3
+          periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webhook-receiver
+  namespace: external-services
+  labels:
+    app: webhook-receiver
+spec:
+  type: ClusterIP
+  selector:
+    app: webhook-receiver
+  ports:
+  - name: http
+    port: 5005
+    targetPort: 5005
+    protocol: TCP
+
