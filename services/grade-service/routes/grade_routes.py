@@ -78,11 +78,15 @@ def create_grade_routes(grade_service: GradeService) -> Blueprint:
         result = grade_service.create_grade(grade)
         
         if result.success:
-            return jsonify({
+            response = {
                 'success': True,
                 'message': result.message,
                 'data': {'id': result.grade_id}
-            }), 201
+            }
+            # Include egress result for demo visibility
+            if result.egress_result:
+                response['egress'] = result.egress_result
+            return jsonify(response), 201
         else:
             return jsonify({
                 'success': False,

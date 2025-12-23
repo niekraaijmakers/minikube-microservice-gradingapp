@@ -24,6 +24,7 @@ from core.database import db
 # Layers
 from repositories.grade_repository import GradeRepository
 from services.student_client import StudentClient
+from services.external_notifier import ExternalNotifier
 from services.grade_service import GradeService
 from routes.grade_routes import create_grade_routes
 from routes.health_routes import create_health_routes
@@ -50,11 +51,13 @@ def create_app() -> Flask:
     
     # 2. External service clients
     student_client = StudentClient()
+    external_notifier = ExternalNotifier()  # Calls httpbin.org (EGRESS DEMO!)
     
     # 3. Service layer (depends on repository + clients)
     grade_service = GradeService(
         repository=grade_repository,
-        student_client=student_client
+        student_client=student_client,
+        external_notifier=external_notifier
     )
     
     # 4. Register routes (depends on services)
@@ -112,10 +115,13 @@ if __name__ == '__main__':
 ║    GET  /health               - Health check                ║
 ║    GET  /api/grades           - List all grades             ║
 ║    GET  /api/grades/<id>      - Get grade by ID             ║
-║    POST /api/grades           - Create grade                ║
+║    POST /api/grades           - Create grade (+ egress!)    ║
 ║    DELETE /api/grades/<id>    - Delete grade                ║
 ║    GET  /api/grades/semesters - List semesters              ║
 ║    GET  /api/grades/courses   - List courses                ║
+║                                                             ║
+║  EGRESS DEMO: POST /api/grades calls httpbin.org            ║
+║  (will be blocked if NetworkPolicy denies external egress)  ║
 ╚════════════════════════════════════════════════════════════╝
     """)
     app.run(host='0.0.0.0', port=Config.SERVICE_PORT, debug=True)

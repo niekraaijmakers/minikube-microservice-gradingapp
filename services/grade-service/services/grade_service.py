@@ -2,11 +2,17 @@
 Grade service.
 Contains business logic for grade operations.
 """
-from dataclasses import dataclass
-from typing import List, Optional, Tuple
+import logging
+from dataclasses import dataclass, field
+from typing import List, Optional, Tuple, Dict, Any
 from models.grade import Grade, VALID_GRADES
 from repositories.grade_repository import GradeRepository
 from services.student_client import StudentClient
+from services.external_notifier import ExternalNotifier, ExternalNotifyResult
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -22,6 +28,7 @@ class CreateGradeResult:
     success: bool
     message: str
     grade_id: Optional[int] = None
+    egress_result: Optional[Dict[str, Any]] = None
 
 
 class GradeService:
@@ -30,13 +37,15 @@ class GradeService:
     
     Orchestrates:
     - Grade repository (data access)
-    - Student client (external service calls)
+    - Student client (internal service call)
+    - External notifier (external egress - may be blocked by NetworkPolicy!)
     """
     
     def __init__(
         self, 
         repository: GradeRepository,
-        student_client: StudentClient
+        student_client: StudentClient,
+        external_notifier: ExternalNotifier = None
     ):
         """
         Initialize with dependencies.
@@ -44,9 +53,11 @@ class GradeService:
         Args:
             repository: GradeRepository for data access
             student_client: StudentClient for student lookups
+            external_notifier: ExternalNotifier for egress demo
         """
         self.repository = repository
         self.student_client = student_client
+        self.external_notifier = external_notifier or ExternalNotifier()
     
     def validate_grade(self, grade: Grade) -> ValidationResult:
         """
@@ -126,11 +137,15 @@ class GradeService:
         """
         Create a new grade.
         
+        This method demonstrates EGRESS patterns:
+        1. Internal egress: Calls student-service to verify student exists
+        2. External egress: Attempts to notify external service (may be blocked!)
+        
         Args:
             grade: Grade to create
             
         Returns:
-            CreateGradeResult with success status and message.
+            CreateGradeResult with success status, message, and egress result.
         """
         # Validate
         validation = self.validate_grade(grade)
@@ -140,26 +155,44 @@ class GradeService:
                 message="; ".join(validation.errors)
             )
         
-        # Verify student exists (egress to student-service)
+        # Verify student exists (INTERNAL egress to student-service)
         if not self.student_client.student_exists(grade.student_id):
             return CreateGradeResult(
                 success=False, 
                 message="Student not found"
             )
         
+        # Get student name for notification
+        student_name = self.student_client.get_student_name(grade.student_id)
+        
         # Create grade
         try:
             grade_id = self.repository.create(grade)
+            logger.info(f"📝 GRADE CREATED: ID={grade_id}, Student={student_name}, Course={grade.course}, Grade={grade.grade}")
         except Exception as e:
+            logger.error(f"❌ GRADE CREATION FAILED: {str(e)}")
             return CreateGradeResult(
                 success=False, 
                 message=f"Failed to create grade: {str(e)}"
             )
         
+        # Attempt EXTERNAL egress - notify external service
+        # This will be BLOCKED if NetworkPolicy doesn't allow external access!
+        egress_result = self.external_notifier.notify_grade_created(
+            student_name=student_name,
+            course=grade.course,
+            grade=grade.grade
+        )
+        
         return CreateGradeResult(
             success=True,
             message="Grade created successfully",
-            grade_id=grade_id
+            grade_id=grade_id,
+            egress_result={
+                'success': egress_result.success,
+                'blocked': egress_result.blocked,
+                'message': egress_result.message
+            }
         )
     
     def delete_grade(self, grade_id: int) -> Tuple[bool, str]:
