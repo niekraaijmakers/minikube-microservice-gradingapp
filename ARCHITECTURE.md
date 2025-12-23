@@ -136,11 +136,11 @@ LEGEND:
 **Policy Details**:
 
 1. **default-deny**: Blocks all traffic by default
-2. **allow-ingress-to-frontend**: Ingress controller → Frontend
-3. **allow-ingress-to-apis**: Ingress controller → Student & Grade services
-4. **allow-frontend-to-backends**: Frontend → Student & Grade services
-5. **allow-grade-to-student**: Grade service → Student service
-6. **allow-dns**: All pods → kube-dns (required for service discovery)
+2. **allow-dns**: All pods → kube-dns (required for service discovery)
+3. **allow-ingress-to-frontend**: Ingress controller → Frontend
+4. **allow-ingress-to-apis**: Ingress controller → Student & Grade services
+5. **allow-frontend-egress**: Frontend → Student & Grade services
+6. **allow-grade-to-student**: Grade service → Student service
 
 ---
 
@@ -193,7 +193,7 @@ Return success → Browser updates
 ```
 Grade Service Pod
     │
-    │ Attempt: curl http://google.com
+    │ Attempt: curl https://httpbin.org/get
     ▼
 NetworkPolicy Check
     │

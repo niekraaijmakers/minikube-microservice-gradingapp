@@ -30,12 +30,6 @@ echo ""
 # Create namespaces
 echo "📦 Creating namespaces..."
 kubectl apply -f "$K8S_DIR/namespace.yaml"
-kubectl apply -f "$K8S_DIR/external-services/namespace.yaml"
-echo ""
-
-# Deploy external services (for egress demo)
-echo "🌐 Deploying external services (webhook-receiver for egress demo)..."
-kubectl apply -f "$K8S_DIR/external-services/webhook-receiver.yaml"
 echo ""
 
 # Deploy services (ClusterIP)
@@ -75,37 +69,23 @@ echo ""
 
 # Ask about network policies
 echo "╔════════════════════════════════════════════════════════════╗"
-echo "║  Network Policies (Egress Demo)                             ║"
+echo "║  Network Policies                                           ║"
 echo "╠════════════════════════════════════════════════════════════╣"
 echo "║  Network policies restrict traffic between pods.            ║"
 echo "║                                                             ║"
-echo "║  For the EGRESS DEMO to work:                               ║"
-echo "║  1. Apply BASE policies (blocks webhook by default)         ║"
-echo "║  2. Try adding a grade → webhook FAILS (blocked!)           ║"
-echo "║  3. Apply webhook policy → webhook SUCCEEDS                 ║"
-echo "║                                                             ║"
-echo "║  This demonstrates NetworkPolicy controlling egress!        ║"
+echo "║  Policies control:                                          ║"
+echo "║  - Which pods can communicate with each other               ║"
+echo "║  - External egress (internet access)                        ║"
 echo "╚════════════════════════════════════════════════════════════╝"
 echo ""
 
-read -p "Apply BASE network policies now? (y/n) " -n 1 -r
+read -p "Apply network policies now? (y/n) " -n 1 -r
 echo ""
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "🔒 Applying base network policies (webhook blocked by default)..."
-    # Apply all policies EXCEPT the webhook egress policy
-    kubectl apply -f "$K8S_DIR/network-policies/00-default-deny.yaml"
-    kubectl apply -f "$K8S_DIR/network-policies/01-allow-dns.yaml"
-    kubectl apply -f "$K8S_DIR/network-policies/02-allow-ingress-to-frontend.yaml"
-    kubectl apply -f "$K8S_DIR/network-policies/03-allow-ingress-to-apis.yaml"
-    kubectl apply -f "$K8S_DIR/network-policies/04-allow-frontend-egress.yaml"
-    kubectl apply -f "$K8S_DIR/network-policies/05-allow-grade-to-student.yaml"
-    kubectl apply -f "$K8S_DIR/network-policies/07-allow-dns-for-external.yaml"
+    echo "🔒 Applying network policies..."
+    kubectl apply -f "$K8S_DIR/network-policies/"
     echo ""
-    echo "✅ Base network policies applied"
-    echo ""
-    echo "📋 NOTE: Webhook egress is currently BLOCKED!"
-    echo "   To allow webhooks, run:"
-    echo "   kubectl apply -f $K8S_DIR/network-policies/06-allow-webhook-egress.yaml"
+    echo "✅ Network policies applied"
 else
     echo "⏭️  Skipping network policies (all traffic allowed)"
     echo "    Apply them later with: kubectl apply -f $K8S_DIR/network-policies/"

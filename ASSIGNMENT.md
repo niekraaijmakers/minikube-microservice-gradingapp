@@ -56,7 +56,7 @@ Create a new microservice to manage courses.
 
 **Bonus:**
 - Add a frontend page to manage courses
-- Modify grade-service to validate course codes
+- Modify grade-service to validate course codes 
 
 ---
 
@@ -97,7 +97,7 @@ Create a service that calculates statistics and analytics.
 
 ### 🔔 Option C: Notification Service (Advanced)
 
-Create a service that sends notifications (simulated for this exercise).
+Create a service that sends notifications and demonstrates external egress.
 
 **Requirements:**
 1. Create a `notification-service` on port `5005`
@@ -105,9 +105,10 @@ Create a service that sends notifications (simulated for this exercise).
    - `POST /api/notifications/send` - Queue a notification
    - `GET /api/notifications` - List pending notifications
    - `GET /api/notifications/<id>` - Get notification status
+   - `GET /api/notifications/test-egress` - Test external internet access
    - `GET /health` - Health check
 
-3. Notification types:
+3. Notification data model:
    ```json
    {
      "id": 1,
@@ -119,17 +120,28 @@ Create a service that sends notifications (simulated for this exercise).
    }
    ```
 
-4. Modify grade-service to call notification-service when a grade is created
+4. **Egress Challenge**: Add an endpoint that attempts to reach an external URL (e.g., `https://httpbin.org/get` or `https://ifconfig.me`). This demonstrates external egress.
 
-5. **Egress Challenge**: The notification service should try to call an external webhook (simulated). Create a NetworkPolicy that:
-   - ALLOWS notification-service → student-service (to get student email)
-   - BLOCKS notification-service → external internet
+5. Create NetworkPolicies that:
+   - ALLOW notification-service → student-service (to get student info)
+   - BLOCK notification-service → external internet (default)
    
-   Then modify the policy to ALLOW specific external access and observe the difference.
+   Then create a second policy that ALLOWS external egress and observe the difference:
+   ```bash
+   # Test from inside the pod
+   kubectl exec -it deployment/notification-service -n grading-system -- \
+     curl -s --max-time 5 https://httpbin.org/get
+   
+   # With egress blocked: connection times out
+   # With egress allowed: returns JSON response
+   ```
+
+6. Create Kubernetes manifests (Deployment, Service, NetworkPolicy)
+7. Update Ingress for `/api/notifications`
 
 **Bonus:**
-- Implement a simple queue mechanism
-- Add retry logic for failed notifications
+- Call student-service to get the student's name when sending notifications
+- Add a simple in-memory queue for pending notifications
 
 ---
 
@@ -249,7 +261,7 @@ kubectl logs -f deployment/your-service -n grading-system
 curl http://grading.local/api/your-endpoint
 
 # Test NetworkPolicy
-kubectl exec -it deployment/your-service -n grading-system -- curl http://google.com
+kubectl exec -it deployment/your-service -n grading-system -- curl -s --max-time 5 https://httpbin.org/get
 ```
 
 ---

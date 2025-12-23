@@ -78,22 +78,11 @@ def create_grade_routes(grade_service: GradeService) -> Blueprint:
         result = grade_service.create_grade(grade)
         
         if result.success:
-            response_data = {
+            return jsonify({
                 'success': True,
                 'message': result.message,
                 'data': {'id': result.grade_id}
-            }
-            
-            # Include webhook result for demo visibility
-            if result.webhook_result:
-                response_data['webhook'] = {
-                    'success': result.webhook_result.success,
-                    'error': result.webhook_result.error,
-                    'blocked': result.webhook_result.blocked,
-                    'response': result.webhook_result.response
-                }
-            
-            return jsonify(response_data), 201
+            }), 201
         else:
             return jsonify({
                 'success': False,

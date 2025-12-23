@@ -8,10 +8,6 @@ This service demonstrates a clean layered architecture:
 - routes/       HTTP endpoint handlers (presentation layer)
 - core/         Configuration and shared utilities
 
-This service also demonstrates EGRESS patterns:
-1. Calling student-service (inter-service communication)
-2. Sending webhook notifications (may be blocked by NetworkPolicy!)
-
 Architecture Principles:
 1. Dependency Injection - components receive their dependencies
 2. Single Responsibility - each class has one job
@@ -28,10 +24,8 @@ from core.database import db
 # Layers
 from repositories.grade_repository import GradeRepository
 from services.student_client import StudentClient
-from services.webhook_service import WebhookService
 from services.grade_service import GradeService
 from routes.grade_routes import create_grade_routes
-from routes.webhook_routes import create_webhook_routes
 from routes.health_routes import create_health_routes
 
 
@@ -56,19 +50,16 @@ def create_app() -> Flask:
     
     # 2. External service clients
     student_client = StudentClient()
-    webhook_service = WebhookService()
     
     # 3. Service layer (depends on repository + clients)
     grade_service = GradeService(
         repository=grade_repository,
-        student_client=student_client,
-        webhook_service=webhook_service
+        student_client=student_client
     )
     
     # 4. Register routes (depends on services)
     app.register_blueprint(create_health_routes())
     app.register_blueprint(create_grade_routes(grade_service))
-    app.register_blueprint(create_webhook_routes(webhook_service))
     
     # === ERROR HANDLERS ===
     @app.errorhandler(404)
@@ -109,7 +100,6 @@ if __name__ == '__main__':
 ╠════════════════════════════════════════════════════════════╣
 ║  Port: {Config.SERVICE_PORT}                                              ║
 ║  Student Service: {Config.STUDENT_SERVICE_URL:<34} ║
-║  Webhook URL: {Config.WEBHOOK_URL:<39} ║
 ║  Database: In-memory SQLite                                 ║
 ║                                                             ║
 ║  Architecture:                                              ║
@@ -122,12 +112,10 @@ if __name__ == '__main__':
 ║    GET  /health               - Health check                ║
 ║    GET  /api/grades           - List all grades             ║
 ║    GET  /api/grades/<id>      - Get grade by ID             ║
-║    POST /api/grades           - Create grade (+ webhook)    ║
+║    POST /api/grades           - Create grade                ║
 ║    DELETE /api/grades/<id>    - Delete grade                ║
 ║    GET  /api/grades/semesters - List semesters              ║
 ║    GET  /api/grades/courses   - List courses                ║
-║    GET  /api/webhook/status   - Webhook status              ║
-║    POST /api/webhook/test     - Test webhook (egress demo)  ║
 ╚════════════════════════════════════════════════════════════╝
     """)
     app.run(host='0.0.0.0', port=Config.SERVICE_PORT, debug=True)

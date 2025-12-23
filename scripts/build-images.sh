@@ -46,12 +46,6 @@ docker build -t frontend:latest "$PROJECT_ROOT/services/frontend"
 echo "✅ frontend built"
 echo ""
 
-# Build webhook-receiver (external service for egress demo)
-echo "📦 Building webhook-receiver..."
-docker build -t webhook-receiver:latest "$PROJECT_ROOT/services/webhook-receiver"
-echo "✅ webhook-receiver built"
-echo ""
-
 echo "╔════════════════════════════════════════════════════════════╗"
 echo "║              Images Built Successfully! ✅                  ║"
 echo "╠════════════════════════════════════════════════════════════╣"
@@ -60,7 +54,6 @@ echo "║  Images available in minikube:                              ║"
 echo "║    - student-service:latest                                 ║"
 echo "║    - grade-service:latest                                   ║"
 echo "║    - frontend:latest                                        ║"
-echo "║    - webhook-receiver:latest  (egress demo)                 ║"
 echo "║                                                             ║"
 echo "║  Next step:                                                 ║"
 echo "║    Deploy to Kubernetes: ./scripts/deploy.sh                ║"
@@ -70,6 +63,6 @@ echo ""
 
 # List images
 echo "📋 Docker images in minikube:"
-docker images | grep -E "(student-service|grade-service|frontend|webhook-receiver|REPOSITORY)"
+docker images | grep -E "(student-service|grade-service|frontend|REPOSITORY)"
 echo ""
 

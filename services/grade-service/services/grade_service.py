@@ -5,10 +5,8 @@ Contains business logic for grade operations.
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 from models.grade import Grade, VALID_GRADES
-from models.webhook_status import WebhookResult
 from repositories.grade_repository import GradeRepository
 from services.student_client import StudentClient
-from services.webhook_service import WebhookService
 
 
 @dataclass
@@ -24,7 +22,6 @@ class CreateGradeResult:
     success: bool
     message: str
     grade_id: Optional[int] = None
-    webhook_result: Optional[WebhookResult] = None
 
 
 class GradeService:
@@ -33,15 +30,13 @@ class GradeService:
     
     Orchestrates:
     - Grade repository (data access)
-    - Student client (external service calls - egress demo)
-    - Webhook service (external notifications - egress demo)
+    - Student client (external service calls)
     """
     
     def __init__(
         self, 
         repository: GradeRepository,
-        student_client: StudentClient,
-        webhook_service: WebhookService
+        student_client: StudentClient
     ):
         """
         Initialize with dependencies.
@@ -49,11 +44,9 @@ class GradeService:
         Args:
             repository: GradeRepository for data access
             student_client: StudentClient for student lookups
-            webhook_service: WebhookService for notifications
         """
         self.repository = repository
         self.student_client = student_client
-        self.webhook_service = webhook_service
     
     def validate_grade(self, grade: Grade) -> ValidationResult:
         """
@@ -133,15 +126,11 @@ class GradeService:
         """
         Create a new grade.
         
-        This method demonstrates multiple egress patterns:
-        1. Calls student-service to verify student exists
-        2. Sends webhook notification (may be blocked by NetworkPolicy!)
-        
         Args:
             grade: Grade to create
             
         Returns:
-            CreateGradeResult with success status, message, and webhook result.
+            CreateGradeResult with success status and message.
         """
         # Validate
         validation = self.validate_grade(grade)
@@ -167,19 +156,10 @@ class GradeService:
                 message=f"Failed to create grade: {str(e)}"
             )
         
-        # Get student name for webhook
-        student_name = self.student_client.get_student_name(grade.student_id)
-        
-        # Send webhook notification (EGRESS DEMO!)
-        # This may fail if NetworkPolicy blocks egress to external-services
-        grade.id = grade_id
-        webhook_result = self.webhook_service.send_grade_notification(grade, student_name)
-        
         return CreateGradeResult(
             success=True,
             message="Grade created successfully",
-            grade_id=grade_id,
-            webhook_result=webhook_result
+            grade_id=grade_id
         )
     
     def delete_grade(self, grade_id: int) -> Tuple[bool, str]:

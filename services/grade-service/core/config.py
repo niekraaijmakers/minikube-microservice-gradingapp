@@ -23,11 +23,4 @@ class Config:
         'STUDENT_SERVICE_URL', 
         'http://student-service:5001'
     )
-    
-    # Webhook Configuration (for EGRESS demo)
-    WEBHOOK_URL = os.environ.get(
-        'WEBHOOK_URL', 
-        'http://webhook-receiver.external-services.svc.cluster.local:5005'
-    )
-    WEBHOOK_ENABLED = os.environ.get('WEBHOOK_ENABLED', 'true').lower() == 'true'
 

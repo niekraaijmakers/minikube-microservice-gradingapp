@@ -4,10 +4,7 @@
 # ==============================================================================
 # This script demonstrates how NetworkPolicies control EGRESS (outbound) traffic.
 #
-# The demo uses the webhook notification feature:
-# - Grade-service tries to send a webhook to webhook-receiver when a grade is created
-# - By default, this is BLOCKED by NetworkPolicy
-# - After applying the allow policy, it SUCCEEDS
+# The demo tests whether pods can reach external URLs like httpbin.org
 # ==============================================================================
 
 set -e
@@ -29,10 +26,7 @@ echo "╚═══════════════════════�
 echo ""
 echo "This demo shows how NetworkPolicies control EGRESS (outbound) traffic."
 echo ""
-echo "Scenario:"
-echo "  • Grade-service wants to send webhook notifications to an external service"
-echo "  • The webhook-receiver runs in a different namespace (simulating external)"
-echo "  • NetworkPolicy controls whether this communication is allowed"
+echo "We'll test if pods can reach external URLs like httpbin.org"
 echo ""
 echo "════════════════════════════════════════════════════════════════════"
 echo ""
@@ -44,12 +38,7 @@ if ! kubectl get pods -n grading-system -l app=grade-service 2>/dev/null | grep 
     exit 1
 fi
 
-if ! kubectl get pods -n external-services -l app=webhook-receiver 2>/dev/null | grep -q Running; then
-    echo -e "${RED}❌ Webhook-receiver not running. Deploy first: ./scripts/deploy.sh${NC}"
-    exit 1
-fi
-
-echo -e "${GREEN}✅ All services running${NC}"
+echo -e "${GREEN}✅ Grade-service running${NC}"
 echo ""
 
 # Wait for user
@@ -68,132 +57,81 @@ echo "📋 Current NetworkPolicies in grading-system namespace:"
 kubectl get networkpolicies -n grading-system 2>/dev/null || echo "  (none)"
 echo ""
 
-# Check if webhook egress policy exists
-if kubectl get networkpolicy allow-webhook-egress -n grading-system 2>/dev/null; then
-    echo -e "${YELLOW}⚠️  The allow-webhook-egress policy is already applied.${NC}"
-    echo "   Webhooks will SUCCEED. Delete it to see the blocked behavior:"
-    echo "   kubectl delete networkpolicy allow-webhook-egress -n grading-system"
-    WEBHOOK_ALLOWED=true
-else
-    echo -e "${GREEN}✅ Webhook egress policy NOT applied - webhooks will be BLOCKED${NC}"
-    WEBHOOK_ALLOWED=false
-fi
-echo ""
-
-read -p "Press Enter to test the webhook..."
+read -p "Press Enter to test external egress..."
 echo ""
 
 # ==============================================================================
-# STEP 2: Test webhook (should fail if policy not applied)
+# STEP 2: Test external egress
 # ==============================================================================
 echo "════════════════════════════════════════════════════════════════════"
-echo -e "${BLUE}STEP 2: Test Webhook Notification${NC}"
+echo -e "${BLUE}STEP 2: Test External Egress${NC}"
 echo "════════════════════════════════════════════════════════════════════"
-echo ""
-
-echo "📤 Sending test webhook from grade-service to webhook-receiver..."
-echo "   (grade-service namespace: grading-system)"
-echo "   (webhook-receiver namespace: external-services)"
 echo ""
 
 # Get a grade-service pod
 GRADE_POD=$(kubectl get pods -n grading-system -l app=grade-service -o jsonpath='{.items[0].metadata.name}')
 
-echo "   Using pod: $GRADE_POD"
-echo "   Command: curl -X POST http://webhook-receiver.external-services:5005/webhook/grade-notification"
+echo "📤 Testing egress from grade-service to external internet..."
+echo "   Pod: $GRADE_POD"
+echo "   Target: https://httpbin.org/get"
 echo ""
 echo "   Result:"
 echo "   ─────────────────────────────────────────────────────────────"
 
-# Test the webhook
+# Test external egress
 RESULT=$(kubectl exec -n grading-system "$GRADE_POD" -- \
-    curl -s -X POST \
-    -H "Content-Type: application/json" \
-    -d '{"event":"test","message":"Egress demo test"}' \
-    --max-time 5 \
-    http://webhook-receiver.external-services.svc.cluster.local:5005/webhook/grade-notification 2>&1) || RESULT="CONNECTION_FAILED"
+    curl -s --max-time 10 https://httpbin.org/get 2>&1) || RESULT="CONNECTION_FAILED"
 
-if echo "$RESULT" | grep -q "success"; then
-    echo -e "   ${GREEN}✅ WEBHOOK SUCCEEDED!${NC}"
-    echo "   $RESULT"
+if echo "$RESULT" | grep -q "origin"; then
+    echo -e "   ${GREEN}✅ EXTERNAL EGRESS ALLOWED!${NC}"
+    echo "   Response received from httpbin.org"
     echo ""
-    echo -e "   ${YELLOW}The webhook egress policy is allowing traffic.${NC}"
-else
-    echo -e "   ${RED}❌ WEBHOOK BLOCKED!${NC}"
+    echo -e "   ${YELLOW}NetworkPolicy is allowing external HTTPS traffic.${NC}"
+elif echo "$RESULT" | grep -q "CONNECTION_FAILED\|timed out\|Connection refused"; then
+    echo -e "   ${RED}❌ EXTERNAL EGRESS BLOCKED!${NC}"
     echo "   Connection failed or timed out"
     echo ""
-    echo -e "   ${GREEN}This is expected! NetworkPolicy is blocking egress to external-services.${NC}"
-fi
-
-echo ""
-read -p "Press Enter to continue..."
-echo ""
-
-# ==============================================================================
-# STEP 3: Show how to allow webhook egress
-# ==============================================================================
-echo "════════════════════════════════════════════════════════════════════"
-echo -e "${BLUE}STEP 3: Enable Webhook Egress${NC}"
-echo "════════════════════════════════════════════════════════════════════"
-echo ""
-
-if [ "$WEBHOOK_ALLOWED" = false ]; then
-    echo "To ALLOW webhooks, apply the egress policy:"
-    echo ""
-    echo -e "   ${YELLOW}kubectl apply -f $K8S_DIR/network-policies/06-allow-webhook-egress.yaml${NC}"
-    echo ""
-    
-    read -p "Apply the policy now? (y/n) " -n 1 -r
-    echo ""
-    
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo ""
-        echo "🔓 Applying allow-webhook-egress policy..."
-        kubectl apply -f "$K8S_DIR/network-policies/06-allow-webhook-egress.yaml"
-        echo ""
-        echo -e "${GREEN}✅ Policy applied! Webhooks should now work.${NC}"
-        echo ""
-        
-        sleep 2
-        
-        echo "📤 Testing webhook again..."
-        echo ""
-        
-        RESULT=$(kubectl exec -n grading-system "$GRADE_POD" -- \
-            curl -s -X POST \
-            -H "Content-Type: application/json" \
-            -d '{"event":"test","message":"Egress demo test after policy"}' \
-            --max-time 5 \
-            http://webhook-receiver.external-services.svc.cluster.local:5005/webhook/grade-notification 2>&1) || RESULT="CONNECTION_FAILED"
-        
-        if echo "$RESULT" | grep -q "success"; then
-            echo -e "   ${GREEN}✅ WEBHOOK NOW SUCCEEDS!${NC}"
-            echo "   $RESULT"
-        else
-            echo -e "   ${RED}Still failing - may need a moment to propagate${NC}"
-        fi
-    fi
+    echo -e "   ${GREEN}This is expected if you have a default-deny policy!${NC}"
+    echo "   NetworkPolicy is blocking HTTPS egress to external services."
 else
-    echo "Webhook policy is already applied."
-    echo ""
-    echo "To see the BLOCKED behavior, delete the policy:"
-    echo -e "   ${YELLOW}kubectl delete networkpolicy allow-webhook-egress -n grading-system${NC}"
+    echo -e "   ${YELLOW}⚠️  Unexpected response:${NC}"
+    echo "   $RESULT"
 fi
 
 echo ""
+read -p "Press Enter to test internal egress (service-to-service)..."
 echo ""
 
 # ==============================================================================
-# STEP 4: View webhook logs
+# STEP 3: Test internal egress (service-to-service)
 # ==============================================================================
 echo "════════════════════════════════════════════════════════════════════"
-echo -e "${BLUE}STEP 4: View Webhook Receiver Logs${NC}"
+echo -e "${BLUE}STEP 3: Test Internal Egress (Service-to-Service)${NC}"
 echo "════════════════════════════════════════════════════════════════════"
 echo ""
 
-echo "📋 Recent webhook-receiver logs:"
+echo "📤 Testing egress from grade-service to student-service..."
+echo "   Pod: $GRADE_POD"
+echo "   Target: http://student-service:5001/health"
+echo ""
+echo "   Result:"
 echo "   ─────────────────────────────────────────────────────────────"
-kubectl logs -n external-services -l app=webhook-receiver --tail=10 2>/dev/null || echo "   (no logs)"
+
+RESULT=$(kubectl exec -n grading-system "$GRADE_POD" -- \
+    curl -s --max-time 5 http://student-service:5001/health 2>&1) || RESULT="CONNECTION_FAILED"
+
+if echo "$RESULT" | grep -q "healthy\|status"; then
+    echo -e "   ${GREEN}✅ INTERNAL EGRESS ALLOWED!${NC}"
+    echo "   Response: $RESULT"
+    echo ""
+    echo -e "   ${GREEN}NetworkPolicy allows grade-service → student-service${NC}"
+else
+    echo -e "   ${RED}❌ INTERNAL EGRESS BLOCKED!${NC}"
+    echo "   Response: $RESULT"
+    echo ""
+    echo -e "   ${YELLOW}Check your NetworkPolicy configuration.${NC}"
+fi
+
 echo ""
 
 # ==============================================================================
@@ -210,20 +148,22 @@ echo "  1. NetworkPolicies control EGRESS (outbound) traffic from pods"
 echo ""
 echo "  2. By default (with default-deny policy), all egress is blocked"
 echo ""
-echo "  3. To allow specific egress, you must create a NetworkPolicy that:"
-echo "     - Selects the SOURCE pod (podSelector)"
-echo "     - Specifies the DESTINATION (namespaceSelector + podSelector)"
-echo "     - Specifies the PORTS"
+echo "  3. You must explicitly allow:"
+echo "     - DNS (port 53) for service discovery"
+echo "     - Internal service-to-service communication"
+echo "     - External internet access (if needed)"
 echo ""
-echo "  4. This is useful for:"
+echo "  4. Use cases for egress control:"
 echo "     - Preventing data exfiltration"
 echo "     - Controlling which services can call external APIs"
-echo "     - Enforcing microservice communication patterns"
+echo "     - Compliance and security requirements"
 echo ""
 echo "════════════════════════════════════════════════════════════════════"
 echo ""
 echo "Useful commands:"
 echo "  kubectl get networkpolicies -n grading-system"
-echo "  kubectl describe networkpolicy allow-webhook-egress -n grading-system"
-echo "  kubectl logs -f -n external-services -l app=webhook-receiver"
+echo "  kubectl describe networkpolicy <policy-name> -n grading-system"
+echo ""
+echo "Test egress manually:"
+echo "  kubectl exec -it deployment/grade-service -n grading-system -- curl https://httpbin.org/get"
 echo ""

@@ -196,7 +196,7 @@ kubectl get networkpolicies -n grading-system
 
 # Test blocked egress (from inside a pod)
 kubectl exec -it deploy/grade-service \
-  -n grading-system -- curl http://google.com
+  -n grading-system -- curl -s --max-time 5 https://httpbin.org/get
 # Should timeout/fail!</code>
         </div>
     </div>

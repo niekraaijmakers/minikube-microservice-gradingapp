@@ -27,8 +27,8 @@ spec:
       port: 5001
   
   # NOTE: There is NO rule allowing external internet access!
-  # This means the grade-service cannot reach google.com, httpbin.org, etc.
+  # This means the grade-service cannot reach external internet.
   # Test this with:
-  #   kubectl exec -it deploy/grade-service -n grading-system -- curl http://google.com
+  #   kubectl exec -it deploy/grade-service -n grading-system -- curl -s --max-time 5 https://httpbin.org/get
   # It should timeout or be blocked!
 

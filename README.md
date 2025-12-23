@@ -59,12 +59,10 @@ minikube-cluster/
 ├── services/                      # Microservices source code
 │   ├── student-service/           # Student management API (port 5001)
 │   ├── grade-service/             # Grade management API (port 5002)
-│   ├── frontend/                  # Web UI (port 5000)
-│   └── webhook-receiver/          # External webhook service (port 5005)
+│   └── frontend/                  # Web UI (port 5000)
 │
 ├── k8s/                           # Kubernetes manifests
 │   ├── namespace.yaml             # grading-system namespace
-│   ├── external-services/         # External namespace + webhook-receiver
 │   ├── deployments/               # Deployment configs
 │   ├── services/                  # Service configs
 │   ├── ingress/                   # Ingress routing rules
@@ -138,35 +136,23 @@ Then visit: `http://grading.local` (after adding to /etc/hosts)
 | Concept | How It's Demonstrated |
 |---------|----------------------|
 | **Ingress** | nginx-ingress routes `/api/students`, `/api/grades`, and `/` to different services |
-| **Egress NetworkPolicy** | Grade service tries to send webhooks to external-services namespace - blocked by default! |
+| **Egress NetworkPolicy** | Pods trying to reach external internet - blocked by default! |
 | **Ingress NetworkPolicy** | Only ingress controller can reach frontend; only frontend reaches backend |
 | **Service Discovery** | Services communicate via Kubernetes DNS (`student-service.grading-system.svc`) |
-| **Microservices** | Four independent services with their own APIs |
+| **Microservices** | Three independent services with their own APIs |
 
-## 🎯 Egress Demo: Webhook Notifications
+## 🎯 Egress Demo
 
-The main egress demonstration uses **webhook notifications**:
-
-1. When a grade is added, `grade-service` tries to send a webhook to `webhook-receiver`
-2. `webhook-receiver` runs in a **different namespace** (`external-services`) - simulating an external service
-3. **By default**, NetworkPolicy BLOCKS this cross-namespace communication
-4. After applying the allow policy, webhooks SUCCEED
-
-### Try It Yourself:
+Test how NetworkPolicies control outbound traffic:
 
 ```bash
-# 1. Deploy without webhook egress policy (default)
-./scripts/deploy.sh
+# Test external egress from a pod (should be blocked with default-deny policy)
+kubectl exec -it deployment/grade-service -n grading-system -- \
+    curl -s --max-time 5 https://httpbin.org/get
 
-# 2. Add a grade via the UI - webhook will FAIL (blocked!)
-
-# 3. Apply the egress policy
-kubectl apply -f k8s/network-policies/06-allow-webhook-egress.yaml
-
-# 4. Add another grade - webhook will SUCCEED!
-
-# 5. Check webhook-receiver logs to see the notifications
-kubectl logs -f -n external-services deployment/webhook-receiver
+# Test internal service-to-service communication (should work)
+kubectl exec -it deployment/grade-service -n grading-system -- \
+    curl -s http://student-service:5001/health
 ```
 
 Or run the interactive demo:
@@ -193,7 +179,7 @@ kubectl logs -f deployment/student-service -n grading-system
 kubectl logs -f deployment/grade-service -n grading-system
 
 # Test egress restrictions (from inside a pod)
-kubectl exec -it deployment/student-service -n grading-system -- curl http://google.com
+kubectl exec -it deployment/student-service -n grading-system -- curl -s --max-time 5 https://httpbin.org/get
 # Should be BLOCKED by NetworkPolicy!
 
 # Test internal communication

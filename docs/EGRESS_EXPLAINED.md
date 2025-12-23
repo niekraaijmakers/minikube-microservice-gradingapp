@@ -95,12 +95,12 @@ This allows `my-app` to only connect to the database on port 5432.
 │                              └──────────┘    └────┬─────┘       │
 │                                                   │              │
 │                                                   ▼              │
-│                                            ┌──────────────┐     │
-│                                            │   EXTERNAL   │     │
-│                                            │   INTERNET   │     │
-│                                            │      ❌       │     │
-│                                            │   BLOCKED    │     │
-│                                            └──────────────┘     │
+│                                           ┌───────────────┐     │
+│                                           │   EXTERNAL    │     │
+│                                           │   INTERNET    │     │
+│                                           │      ❌        │     │
+│                                           │   BLOCKED     │     │
+│                                           └───────────────┘     │
 │                                                                  │
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -123,7 +123,7 @@ This allows `my-app` to only connect to the database on port 5432.
 | Frontend | Student Service | ✅ Yes |
 | Frontend | Grade Service | ✅ Yes |
 | Grade Service | Student Service | ✅ Yes |
-| Grade Service | google.com | ❌ No |
+| Grade Service | httpbin.org | ❌ No |
 | Student Service | Grade Service | ❌ No |
 | Student Service | Internet | ❌ No |
 
@@ -140,7 +140,7 @@ kubectl exec -it deployment/grade-service -n grading-system -- \
 ```bash
 # From grade-service, try to reach internet (should fail)
 kubectl exec -it deployment/grade-service -n grading-system -- \
-    curl -s --max-time 5 http://google.com
+    curl -s --max-time 5 https://httpbin.org/get
 # This should timeout!
 ```
 
@@ -176,4 +176,3 @@ kubectl apply -f k8s/network-policies/
 2. **Policies are additive**: Multiple policies combine their rules
 3. **Empty selector = all pods**: `podSelector: {}` matches everything
 4. **No rules = deny all**: An empty ingress/egress list blocks everything
-

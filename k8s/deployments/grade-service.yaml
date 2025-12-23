@@ -30,7 +30,7 @@ spec:
         - name: STUDENT_SERVICE_URL
           value: "http://student-service:5001"
         - name: WEBHOOK_URL
-          value: "http://webhook-receiver.external-services.svc.cluster.local:5005"
+          value: "https://publish-p151153-e341460-cmstg.adobeaemcloud.com/bin/webhook"
         - name: WEBHOOK_ENABLED
           value: "true"
         resources:

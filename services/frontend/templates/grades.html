@@ -126,51 +126,6 @@
     </div>
 </div>
 
-<!-- Webhook Egress Demo Card -->
-<div class="card" style="border-color: var(--accent-purple);">
-    <div class="card-header">
-        <div class="card-title">
-            <span class="card-icon" style="background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));">📤</span>
-            Egress Demo: Webhook Notifications
-        </div>
-        <button class="btn btn-secondary btn-sm" onclick="loadWebhookStatus()">
-            🔄 Refresh
-        </button>
-    </div>
-    
-    <p style="color: var(--text-secondary); margin-bottom: 1rem;">
-        When a grade is added, the grade-service tries to send a webhook notification to an 
-        <strong>external service</strong> (webhook-receiver in a different namespace).
-    </p>
-    
-    <div id="webhook-status" style="margin-bottom: 1rem;">
-        <div class="alert alert-info">
-            <span class="spinner"></span> Loading webhook status...
-        </div>
-    </div>
-    
-    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-        <button class="btn btn-primary" onclick="testWebhook()">
-            🧪 Test Webhook Now
-        </button>
-        <button class="btn btn-secondary" onclick="viewWebhookHistory()">
-            📋 View Webhook History
-        </button>
-    </div>
-    
-    <div id="webhook-result" style="margin-top: 1rem;"></div>
-    
-    <div style="margin-top: 1.5rem; padding: 1rem; background: var(--bg-tertiary); border-radius: var(--radius-sm);">
-        <h4 style="margin-bottom: 0.5rem; font-size: 0.9rem;">🎓 How This Demonstrates Egress:</h4>
-        <ul style="color: var(--text-secondary); font-size: 0.85rem; margin-left: 1.25rem;">
-            <li><strong>Without</strong> allow-webhook-egress policy: Webhook FAILS ❌</li>
-            <li><strong>With</strong> allow-webhook-egress policy: Webhook SUCCEEDS ✅</li>
-        </ul>
-        <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem;">
-            Apply policy: <code>kubectl apply -f k8s/network-policies/06-allow-webhook-egress.yaml</code>
-        </p>
-    </div>
-</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -334,108 +289,6 @@ async function deleteGrade(id) {
     }
 }
 
-async function loadWebhookStatus() {
-    const statusDiv = document.getElementById('webhook-status');
-    
-    try {
-        const response = await fetch('/api/grades/webhook/status');
-        const data = await response.json();
-        
-        if (data.success) {
-            const status = data.status;
-            const hasFailures = status.total_failures > 0;
-            const hasSuccesses = status.total_successes > 0;
-            
-            let statusHtml = '';
-            
-            if (status.total_attempts === 0) {
-                statusHtml = `
-                    <div class="alert alert-info">
-                        📊 No webhook attempts yet. Add a grade to trigger a webhook!
-                    </div>
-                `;
-            } else if (hasSuccesses && !hasFailures) {
-                statusHtml = `
-                    <div class="alert alert-success">
-                        ✅ Webhooks working! ${status.total_successes} successful, 0 failed
-                    </div>
-                `;
-            } else if (hasFailures && !hasSuccesses) {
-                statusHtml = `
-                    <div class="alert alert-error">
-                        ❌ Webhooks BLOCKED! ${status.total_failures} failed, 0 successful
-                        <br><small>NetworkPolicy is blocking egress to external-services namespace</small>
-                    </div>
-                `;
-            } else {
-                statusHtml = `
-                    <div class="alert alert-info">
-                        📊 Mixed results: ${status.total_successes} successful, ${status.total_failures} failed
-                    </div>
-                `;
-            }
-            
-            if (status.last_error) {
-                statusHtml += `<p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.5rem;">Last error: ${status.last_error}</p>`;
-            }
-            
-            statusDiv.innerHTML = statusHtml;
-        }
-    } catch (e) {
-        statusDiv.innerHTML = `<div class="alert alert-error">Could not load webhook status</div>`;
-    }
-}
-
-async function testWebhook() {
-    const resultDiv = document.getElementById('webhook-result');
-    resultDiv.innerHTML = '<div class="alert alert-info"><span class="spinner"></span> Testing webhook...</div>';
-    
-    try {
-        const response = await fetch('/api/grades/webhook/test', { method: 'POST' });
-        const data = await response.json();
-        
-        if (data.success) {
-            resultDiv.innerHTML = `<div class="alert alert-success">${data.message}<br><small>${data.details}</small></div>`;
-        } else {
-            resultDiv.innerHTML = `<div class="alert alert-error">${data.message}<br><small>${data.details || ''}</small></div>`;
-        }
-        
-        // Refresh status
-        loadWebhookStatus();
-    } catch (e) {
-        resultDiv.innerHTML = `<div class="alert alert-error">❌ Could not test webhook: ${e.message}</div>`;
-    }
-}
-
-async function viewWebhookHistory() {
-    const resultDiv = document.getElementById('webhook-result');
-    resultDiv.innerHTML = '<div class="alert alert-info"><span class="spinner"></span> Loading history...</div>';
-    
-    try {
-        // This calls the webhook-receiver service via the grade-service proxy
-        const response = await fetch('/api/grades/webhook/status');
-        const data = await response.json();
-        
-        if (data.success) {
-            const status = data.status;
-            resultDiv.innerHTML = `
-                <div style="background: var(--bg-tertiary); padding: 1rem; border-radius: var(--radius-sm);">
-                    <h4 style="margin-bottom: 0.5rem;">Webhook Statistics</h4>
-                    <table style="width: 100%; font-size: 0.85rem;">
-                        <tr><td>Total Attempts:</td><td><strong>${status.total_attempts}</strong></td></tr>
-                        <tr><td>Successes:</td><td style="color: var(--accent-teal);"><strong>${status.total_successes}</strong></td></tr>
-                        <tr><td>Failures:</td><td style="color: var(--accent-red);"><strong>${status.total_failures}</strong></td></tr>
-                        <tr><td>Last Attempt:</td><td>${status.last_attempt || 'Never'}</td></tr>
-                        <tr><td>Last Success:</td><td>${status.last_success || 'Never'}</td></tr>
-                    </table>
-                </div>
-            `;
-        }
-    } catch (e) {
-        resultDiv.innerHTML = `<div class="alert alert-error">Could not load history</div>`;
-    }
-}
-
 function showAlert(type, message) {
     const container = document.getElementById('alert-container');
     const alert = document.createElement('div');
@@ -455,7 +308,6 @@ function escapeHtml(text) {
 
 // Load data on page load
 loadGrades();
-loadWebhookStatus();
 </script>
 {% endblock %}
 
