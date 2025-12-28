@@ -19,6 +19,18 @@ The system currently has three microservices:
 | **Student Service** | 5001 | CRUD API for student records |
 | **Grade Service** | 5002 | CRUD API for grades |
 
+## Getting Started
+
+📁 **Check the `assignment/` folder** for data model specifications!
+
+```
+assignment/
+├── README.md                    # Overview
+├── option-a-course.md          # Course Service spec
+├── option-b-analytics.md       # Analytics Service spec
+└── option-c-notification.md    # Notification Service spec
+```
+
 ## Your Assignment Options
 
 Choose **ONE** of the following assignments:
@@ -29,12 +41,15 @@ Choose **ONE** of the following assignments:
 
 Create a new microservice to manage courses.
 
+> 📋 **Spec:** See `assignment/option-a-course.md` for the full data model specification
+
 **Requirements:**
 1. Create a `course-service` that runs on port `5003`
 2. Implement the following API endpoints:
    - `GET /api/courses` - List all courses
-   - `GET /api/courses/<id>` - Get course by ID
-   - `POST /api/courses` - Create a course
+   - `POST /api/courses` - Create a course (returns ID)
+   - `GET /api/courses/<id>` - Get course by ID (use ID from POST)
+   - `GET /api/courses/code/<code>` - Get course by code (e.g., CS101)
    - `DELETE /api/courses/<id>` - Delete a course
    - `GET /health` - Health check
 
@@ -45,8 +60,8 @@ Create a new microservice to manage courses.
      "code": "CS101",
      "name": "Introduction to Programming",
      "credits": 4,
-     "department": "Computer Science",
-     "instructor": "Dr. Smith"
+     "instructor": "Dr. Smith",
+     "semester": "Fall 2024"
    }
    ```
 
@@ -63,6 +78,8 @@ Create a new microservice to manage courses.
 ### 📊 Option B: Analytics Service (Intermediate)
 
 Create a service that calculates statistics and analytics.
+
+> 📋 **Spec:** See `assignment/option-b-analytics.md` for response models and GPA calculation
 
 **Requirements:**
 1. Create an `analytics-service` that runs on port `5004`
@@ -97,51 +114,97 @@ Create a service that calculates statistics and analytics.
 
 ### 🔔 Option C: Notification Service (Advanced)
 
-Create a service that sends notifications and demonstrates external egress.
+Create a service that manages notifications and demonstrates **external egress** (calling external URLs from inside the cluster).
+
+> 📋 **Spec:** See `assignment/option-c-notification.md` for the full data model and egress details
+
+**Scenario:**
+When a grade is posted, the system should notify the student. Your notification service will simulate sending an email/SMS by calling an external API (`https://httpbin.org/get`). This demonstrates how Kubernetes NetworkPolicies can control outbound internet access.
 
 **Requirements:**
-1. Create a `notification-service` on port `5005`
-2. Implement:
-   - `POST /api/notifications/send` - Queue a notification
-   - `GET /api/notifications` - List pending notifications
-   - `GET /api/notifications/<id>` - Get notification status
-   - `GET /api/notifications/test-egress` - Test external internet access
-   - `GET /health` - Health check
 
-3. Notification data model:
+1. Create a `notification-service` on port `5005`
+
+2. Implement these endpoints:
+   | Method | Endpoint | Description |
+   |--------|----------|-------------|
+   | POST | `/api/notifications` | Create AND send a notification (returns ID) |
+   | GET | `/api/notifications` | List all notifications |
+   | GET | `/api/notifications/<id>` | Get notification by ID (use ID from POST) |
+   | GET | `/health` | Health check |
+
+3. **How it works:**
+   - `POST /api/notifications` creates a notification AND immediately attempts to send it
+   - The "send" action makes an HTTP GET to `https://httpbin.org/get` (simulating an external email/SMS API)
+   - The response includes the notification ID and whether sending succeeded or was blocked
+   - Use `GET /api/notifications/<id>` to retrieve the full notification details later
+
+4. **Example flow:**
+   ```bash
+   # Create and send a notification
+   curl -X POST http://grading.local/api/notifications \
+     -H "Content-Type: application/json" \
+     -d '{"student_id": 1, "message": "Your grade for CS101: A"}'
+   
+   # Response includes the ID and send status:
+   # {"id": 1, "status": "sent", "egress_blocked": false}
+   # OR if NetworkPolicy blocks it:
+   # {"id": 1, "status": "failed", "egress_blocked": true}
+   
+   # Retrieve the notification details using the returned ID
+   curl http://grading.local/api/notifications/1
+   ```
+
+5. **Data model** (see `assignment/models/notification.py` for starter code):
    ```json
    {
      "id": 1,
-     "type": "grade_posted",
-     "recipient_id": 1,
-     "message": "Your grade for CS101 has been posted",
-     "status": "pending|sent|failed",
-     "created_at": "2024-01-15T10:30:00Z"
+     "student_id": 1,
+     "message": "Your grade for CS101 has been posted: A",
+     "status": "sent",
+     "egress_blocked": false,
+     "created_at": "2024-01-15T10:30:00Z",
+     "sent_at": "2024-01-15T10:30:01Z",
+     "external_response": {"args": {...}, "url": "..."}
    }
    ```
-
-4. **Egress Challenge**: Add an endpoint that attempts to reach an external URL (e.g., `https://httpbin.org/get` or `https://ifconfig.me`). This demonstrates external egress.
-
-5. Create NetworkPolicies that:
-   - ALLOW notification-service → student-service (to get student info)
-   - BLOCK notification-service → external internet (default)
    
-   Then create a second policy that ALLOWS external egress and observe the difference:
+   Status values: `sent` (success) or `failed` (blocked/error)
+
+6. **Egress Challenge** - Create TWO NetworkPolicies:
+
+   **Policy 1: Base policy (always applied)**
+   - Block external internet access (default-deny already does this)
+   
+   **Policy 2: External egress policy (toggle on/off for demo)**
+   - ALLOW notification-service → external HTTPS (port 443)
+   - Use `ipBlock` with `0.0.0.0/0` and `except` for private ranges
+
+   Test the difference:
    ```bash
-   # Test from inside the pod
-   kubectl exec -it deployment/notification-service -n grading-system -- \
-     curl -s --max-time 5 https://httpbin.org/get
+   # Without external egress policy: sending fails (blocked)
+   curl -X POST http://grading.local/api/notifications \
+     -H "Content-Type: application/json" \
+     -d '{"student_id": 1, "message": "Test notification"}'
+   # Response: {"id": 1, "status": "failed", "egress_blocked": true}
    
-   # With egress blocked: connection times out
-   # With egress allowed: returns JSON response
+   # Apply external egress policy
+   kubectl apply -f k8s/network-policies/XX-allow-notification-egress.yaml
+   
+   # Now sending works!
+   curl -X POST http://grading.local/api/notifications \
+     -H "Content-Type: application/json" \
+     -d '{"student_id": 2, "message": "Another test"}'
+   # Response: {"id": 2, "status": "sent", "egress_blocked": false}
    ```
 
-6. Create Kubernetes manifests (Deployment, Service, NetworkPolicy)
-7. Update Ingress for `/api/notifications`
+7. Create Kubernetes manifests (Deployment, Service, NetworkPolicy)
+8. Update Ingress for `/api/notifications`
 
 **Bonus:**
-- Call student-service to get the student's name when sending notifications
-- Add a simple in-memory queue for pending notifications
+- Call student-service to get the student's name and include it in the notification
+- Add logging to show egress attempts in pod logs
+- Create a frontend page showing notification status with send buttons
 
 ---
 
