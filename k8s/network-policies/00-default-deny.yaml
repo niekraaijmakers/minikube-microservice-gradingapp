@@ -1,23 +1,31 @@
-# Default Deny All Traffic
-# ========================
-# This NetworkPolicy blocks ALL ingress and egress traffic by default.
-# Other policies will then explicitly allow specific traffic flows.
+# Default Network Policy - Simple Setup
+# ======================================
+# - Allow ALL traffic within the namespace (pods can talk freely)
+# - Allow traffic from Ingress controller (for external HTTP access)
+# - Block direct external access that bypasses Ingress
 #
-# This is a security best practice: deny by default, allow explicitly.
-#
-# IMPORTANT: Without this policy, all traffic is allowed!
-# With this policy, only traffic explicitly allowed by other policies will work.
+# This is less restrictive but much simpler to understand!
 
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: default-deny-all
+  name: default-allow-internal
   namespace: grading-system
 spec:
-  # Apply to ALL pods in the namespace
-  podSelector: {}
+  podSelector: {}  # Apply to all pods
   policyTypes:
   - Ingress
   - Egress
-  # No ingress or egress rules = deny all
-
+  ingress:
+  # Allow ALL traffic from within the namespace
+  - from:
+    - podSelector: {}
+  # Allow traffic from ingress-nginx (external HTTP via Ingress resource)
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+  egress:
+  # Allow ALL traffic to within the namespace
+  - to:
+    - podSelector: {}
