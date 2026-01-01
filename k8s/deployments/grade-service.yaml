@@ -29,10 +29,6 @@ spec:
           value: "5002"
         - name: STUDENT_SERVICE_URL
           value: "http://student-service:5001"
-        - name: WEBHOOK_URL
-          value: "https://publish-p151153-e341460-cmstg.adobeaemcloud.com/bin/webhook"
-        - name: WEBHOOK_ENABLED
-          value: "true"
         resources:
           requests:
             memory: "64Mi"
