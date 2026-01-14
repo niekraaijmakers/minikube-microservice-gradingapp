@@ -17,7 +17,7 @@ build:
 	./scripts/build-images.sh
 
 # Deploy to Kubernetes
-deploy:
+deploy: build 
 	@echo "🎯 Deploying to Kubernetes..."
 	./scripts/deploy.sh
 
